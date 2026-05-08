@@ -3,7 +3,9 @@ from typing import Any, Literal
 
 from fastmcp import FastMCP
 
+from osrs_mcp.prices import PricesClient
 from osrs_mcp.runelite import RuneLiteSyncClient, RuneLiteSyncError
+from osrs_mcp.wiki import WikiClient
 from osrs_mcp.wiseoldman import WiseOldManClient, WiseOldManError
 
 Section = Literal[
@@ -33,10 +35,14 @@ WIKI_SECTIONS = {"quests", "diaries", "combat_achievements", "music", "collectio
 
 Period = Literal["5min", "day", "week", "month", "year"]
 CompetitionStatus = Literal["upcoming", "ongoing", "finished"]
+PageFormat = Literal["wikitext", "html"]
+Timestep = Literal["5m", "1h", "6h", "24h"]
 
 mcp: FastMCP = FastMCP("osrs-mcp")
 _wom = WiseOldManClient.build()
 _runelite = RuneLiteSyncClient.build()
+_wiki = WikiClient.build()
+_prices = PricesClient.build()
 
 
 @mcp.tool
@@ -209,6 +215,64 @@ async def update_player(username: str) -> Any:
         return await _wom.update(username)
     except WiseOldManError as e:
         return {"error": e.message, "status": e.status}
+
+
+@mcp.tool
+async def wiki_search(query: str, limit: int = 10) -> list[dict[str, Any]]:
+    """Search the OSRS Wiki (oldschool.runescape.wiki) for matching pages.
+
+    Returns a list of {title, snippet, sectiontitle} entries. Use `wiki_page`
+    to fetch the contents of a result.
+    """
+    return await _wiki.search(query, limit=limit)
+
+
+@mcp.tool
+async def wiki_page(
+    title: str, format: PageFormat = "wikitext"
+) -> dict[str, Any] | None:
+    """Fetch a single OSRS Wiki page by title.
+
+    `format`:
+    - `wikitext` (default) — wiki markup source. Smaller and easier for an LLM
+      to parse than HTML.
+    - `html` — fully rendered HTML. Use only when you specifically need
+      formatting/templates expanded.
+
+    Returns null if the page does not exist. Redirects are followed
+    automatically.
+    """
+    return await _wiki.page(title, fmt=format)
+
+
+@mcp.tool
+async def ge_item(name_or_id: str) -> dict[str, Any]:
+    """Grand Exchange data for an item by name or numeric ID.
+
+    Resolves the name against the OSRS Wiki real-time prices mapping (also
+    accepts substrings, e.g. 'whip' → 'Abyssal whip'). Returns metadata
+    (members flag, examine, alch values, GE buy limit) plus the latest
+    high/low price ticks with timestamps.
+    """
+    item = await _prices.resolve(name_or_id)
+    if item is None:
+        return {"error": f"item not found: {name_or_id}"}
+    latest = await _prices.latest(item["id"])
+    return {"item": item, "latest": latest}
+
+
+@mcp.tool
+async def ge_item_history(name_or_id: str, timestep: Timestep = "1h") -> dict[str, Any]:
+    """Historical Grand Exchange price timeseries for an item.
+
+    `timestep`: `5m`, `1h`, `6h`, or `24h`. Each point has timestamp,
+    avgHighPrice, avgLowPrice, highPriceVolume, lowPriceVolume.
+    """
+    item = await _prices.resolve(name_or_id)
+    if item is None:
+        return {"error": f"item not found: {name_or_id}"}
+    series = await _prices.timeseries(item["id"], timestep=timestep)
+    return {"item": item, "timestep": timestep, "data": series}
 
 
 async def _noop() -> None:

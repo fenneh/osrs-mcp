@@ -1,12 +1,15 @@
 # osrs-mcp
 
-MCP server for Old School RuneScape player lookups. Combines two data sources:
+MCP server for Old School RuneScape. Combines four data sources:
 
-- **[WiseOldMan](https://wiseoldman.net)** — authoritative for stats (skills, bosses, activities, gains, records, competitions, groups, name history).
-- **[RuneLite Sync](https://sync.runescape.wiki)** (RuneScape Wiki) — authoritative for progression flags (quests, achievement diaries, combat achievements, music, collection log). Only populated for players who have synced via the RuneLite plugin.
+- **[WiseOldMan](https://wiseoldman.net)** — player stats, gains, records, competitions, groups, name history.
+- **[RuneLite Sync](https://sync.runescape.wiki)** — quests, achievement diaries, combat achievements, music, collection log (only populated for players who have synced via the RuneLite plugin).
+- **OSRS Wiki API** (`oldschool.runescape.wiki`) — wiki search and page lookup.
+- **OSRS Wiki real-time prices** (`prices.runescape.wiki`) — live Grand Exchange prices and historical timeseries.
 
 ## Tools
 
+### Player
 - `get_player(username, sections?)` — combined snapshot. `sections` selects from `overview`, `skills`, `bosses`, `activities` (WOM) and `quests`, `diaries`, `combat_achievements`, `music`, `collection_log` (wiki). Defaults exclude `music` and `collection_log`.
 - `get_player_gains(username, period?, metric?, start_date?, end_date?)`
 - `get_player_records(username, period?, metric?)`
@@ -15,6 +18,14 @@ MCP server for Old School RuneScape player lookups. Combines two data sources:
 - `get_player_groups(username)`
 - `get_player_name_history(username)`
 - `update_player(username)` — refresh WOM from hiscores (rate-limited upstream).
+
+### Wiki
+- `wiki_search(query, limit?)` — search the OSRS Wiki for matching pages.
+- `wiki_page(title, format?)` — fetch a page as `wikitext` (default) or `html`. Follows redirects.
+
+### Grand Exchange
+- `ge_item(name_or_id)` — current GE price + item metadata. Resolves names (incl. substrings, e.g. `whip` → `Abyssal whip`) or numeric IDs.
+- `ge_item_history(name_or_id, timestep?)` — price timeseries (`5m`/`1h`/`6h`/`24h`).
 
 ## Hosted endpoint
 

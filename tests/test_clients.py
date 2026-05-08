@@ -2,8 +2,12 @@ import httpx
 import pytest
 import respx
 
+from osrs_mcp.prices import BASE_URL as PRICES_BASE
+from osrs_mcp.prices import PricesClient
 from osrs_mcp.runelite import BASE_URL as RUNELITE_BASE
 from osrs_mcp.runelite import RuneLiteSyncClient
+from osrs_mcp.wiki import BASE_URL as WIKI_URL
+from osrs_mcp.wiki import WikiClient
 from osrs_mcp.wiseoldman import BASE_URL as WOM_BASE
 from osrs_mcp.wiseoldman import WiseOldManClient, WiseOldManError
 
@@ -88,3 +92,107 @@ async def test_runelite_sync_success():
             await client.aclose()
         assert data["username"] == "fensational"
         assert data["quests"]["Cook's Assistant"] == 2
+
+
+async def test_wiki_search_returns_list():
+    async with respx.mock() as mock:
+        mock.get(WIKI_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "query": {
+                        "search": [
+                            {"title": "Abyssal whip", "snippet": "weapon"},
+                            {"title": "Abyssal demon", "snippet": "monster"},
+                        ]
+                    }
+                },
+            )
+        )
+        client = WikiClient(httpx.AsyncClient())
+        try:
+            results = await client.search("abyssal", limit=2)
+        finally:
+            await client.aclose()
+        assert len(results) == 2
+        assert results[0]["title"] == "Abyssal whip"
+
+
+async def test_wiki_page_wikitext():
+    async with respx.mock() as mock:
+        mock.get(WIKI_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "parse": {
+                        "title": "Abyssal whip",
+                        "pageid": 12345,
+                        "wikitext": "{{Infobox|name=Abyssal whip}}",
+                    }
+                },
+            )
+        )
+        client = WikiClient(httpx.AsyncClient())
+        try:
+            page = await client.page("Abyssal whip")
+        finally:
+            await client.aclose()
+        assert page["format"] == "wikitext"
+        assert "Infobox" in page["content"]
+
+
+async def test_prices_resolve_by_name_substring():
+    async with respx.mock(base_url=PRICES_BASE) as mock:
+        mock.get("/mapping").mock(
+            return_value=httpx.Response(
+                200,
+                json=[
+                    {"id": 4151, "name": "Abyssal whip", "members": True},
+                    {"id": 1234, "name": "Bronze sword", "members": False},
+                ],
+            )
+        )
+        client = PricesClient(httpx.AsyncClient(base_url=PRICES_BASE))
+        try:
+            item = await client.resolve("whip")
+            by_id = await client.resolve(4151)
+            missing = await client.resolve("not a real item")
+        finally:
+            await client.aclose()
+        assert item["id"] == 4151
+        assert by_id["name"] == "Abyssal whip"
+        assert missing is None
+
+
+async def test_prices_latest_unwraps_id_key():
+    async with respx.mock(base_url=PRICES_BASE) as mock:
+        mock.get("/latest").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "4151": {
+                            "high": 1200000,
+                            "highTime": 1700000000,
+                            "low": 1190000,
+                            "lowTime": 1700000100,
+                        }
+                    }
+                },
+            )
+        )
+        client = PricesClient(httpx.AsyncClient(base_url=PRICES_BASE))
+        try:
+            entry = await client.latest(4151)
+        finally:
+            await client.aclose()
+        assert entry["high"] == 1200000
+
+
+async def test_prices_timeseries_rejects_bad_step():
+    client = PricesClient(httpx.AsyncClient(base_url=PRICES_BASE))
+    try:
+        with pytest.raises(ValueError):
+            await client.timeseries(4151, timestep="2h")
+    finally:
+        await client.aclose()
