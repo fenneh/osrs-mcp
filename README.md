@@ -32,7 +32,7 @@ An MCP server for looking up Old School RuneScape players, items, and wiki pages
 
 ## Hosted endpoint
 
-A public instance runs at `https://osrs.mcp.fen.gg/mcp` with no auth. Add it as a custom connector in any MCP client. If you're going to hammer it, please run your own.
+A public instance runs at `https://osrs-mcp.fen.gg/mcp` with no auth. Add it as a custom connector in any MCP client. If you're going to hammer it, please run your own.
 
 ## Local install (stdio)
 
