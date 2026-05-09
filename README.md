@@ -1,35 +1,38 @@
 # osrs-mcp
 
-MCP server for Old School RuneScape. Combines four data sources:
+An MCP server for looking up Old School RuneScape players, items, and wiki pages. Talks to four upstreams:
 
-- **[WiseOldMan](https://wiseoldman.net)** — player stats, gains, records, competitions, groups, name history.
-- **[RuneLite Sync](https://sync.runescape.wiki)** — quests, achievement diaries, combat achievements, music, collection log (only populated for players who have synced via the RuneLite plugin).
-- **OSRS Wiki API** (`oldschool.runescape.wiki`) — wiki search and page lookup.
-- **OSRS Wiki real-time prices** (`prices.runescape.wiki`) — live Grand Exchange prices and historical timeseries.
+- WiseOldMan for stats, gains, records, competitions, groups, name history
+- RuneLite Sync for quests, diaries, combat achievements, music, collection log (only populated if the player has uploaded via the RuneLite plugin)
+- The OSRS Wiki API for search and page lookup
+- The OSRS Wiki real-time prices API for Grand Exchange data
 
 ## Tools
 
 ### Player
-- `get_player(username, sections?)` — combined snapshot. `sections` selects from `overview`, `skills`, `bosses`, `activities` (WOM) and `quests`, `diaries`, `combat_achievements`, `music`, `collection_log` (wiki). Defaults exclude `music` and `collection_log`.
+
+- `get_player(username, sections?)`. Combined snapshot. `sections` picks from `overview`, `skills`, `bosses`, `activities` (WOM) and `quests`, `diaries`, `combat_achievements`, `music`, `collection_log` (wiki). Defaults skip `music` and `collection_log` because they're huge and rarely useful.
 - `get_player_gains(username, period?, metric?, start_date?, end_date?)`
 - `get_player_records(username, period?, metric?)`
 - `get_player_achievements(username, include_progress?)`
 - `get_player_competitions(username, status?)`
 - `get_player_groups(username)`
 - `get_player_name_history(username)`
-- `update_player(username)` — refresh WOM from hiscores (rate-limited upstream).
+- `update_player(username)`. Kicks WOM into refreshing from the hiscores. Rate-limited upstream to roughly once per 60s per player.
 
 ### Wiki
-- `wiki_search(query, limit?)` — search the OSRS Wiki for matching pages.
-- `wiki_page(title, format?)` — fetch a page as `wikitext` (default) or `html`. Follows redirects.
+
+- `wiki_search(query, limit?)`
+- `wiki_page(title, format?)`. `wikitext` (default) or `html`. Follows redirects.
 
 ### Grand Exchange
-- `ge_item(name_or_id)` — current GE price + item metadata. Resolves names (incl. substrings, e.g. `whip` → `Abyssal whip`) or numeric IDs.
-- `ge_item_history(name_or_id, timestep?)` — price timeseries (`5m`/`1h`/`6h`/`24h`).
+
+- `ge_item(name_or_id)`. Current price plus item metadata. Names match exactly first, then fall back to substring, so `whip` finds `Abyssal whip`.
+- `ge_item_history(name_or_id, timestep?)`. Price timeseries. `timestep` is `5m`, `1h`, `6h`, or `24h`.
 
 ## Hosted endpoint
 
-Public streamable-HTTP MCP at `https://osrs.mcp.fen.gg/mcp`. Add it as a custom connector in any MCP-aware client; no auth required.
+A public instance runs at `https://osrs.mcp.fen.gg/mcp` with no auth. Add it as a custom connector in any MCP client. If you're going to hammer it, please run your own.
 
 ## Local install (stdio)
 
@@ -39,7 +42,7 @@ cd ~/git/osrs-mcp
 uv sync
 ```
 
-Claude Code config (`~/.claude/claude_code_config.json` or via `claude mcp add`):
+Wire it into Claude Code:
 
 ```json
 {
@@ -56,8 +59,9 @@ Claude Code config (`~/.claude/claude_code_config.json` or via `claude mcp add`)
 
 ```bash
 uv run python -m osrs_mcp --http --port 3000
-# MCP endpoint: http://localhost:3000/mcp
 ```
+
+Endpoint at `http://localhost:3000/mcp`.
 
 ## Tests
 
