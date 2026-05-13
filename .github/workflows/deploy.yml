@@ -3,14 +3,17 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 0
-      - uses: dokku/github-action@master
+      - uses: dokku/github-action@cc7dec1d2b9fed249a14ae462bc953bba436f78c  # v1.10.0
         with:
           git_remote_url: ${{ secrets.DOKKU_REMOTE_URL }}
           ssh_private_key: ${{ secrets.DOKKU_SSH_KEY }}
